@@ -117,7 +117,7 @@ def model_fn(features, labels, mode, params):
           mode=mode, loss=loss, predictions={"predictions": logits},
           eval_metric_ops=metrics.get_eval_metrics(logits, labels, params))
     else:
-      train_op, metric_dict = get_train_op(loss, params)
+      train_op, metric_dict = get_train_op_and_metrics(loss, params)
 
       # Epochs can be quite long. This gives some intermediate information
       # in TensorBoard.
@@ -158,8 +158,8 @@ def get_learning_rate(learning_rate, hidden_size, learning_rate_warmup_steps):
     return learning_rate
 
 
-def get_train_op(loss, params):
-  """Generate training op and summary dict."""
+def get_train_op_and_metrics(loss, params):
+  """Generate training op and metrics to save in TensorBoard."""
   with tf.variable_scope("get_train_op"):
     learning_rate = get_learning_rate(
         learning_rate=params["learning_rate"],
@@ -174,7 +174,7 @@ def get_train_op(loss, params):
         beta2=params["optimizer_adam_beta2"],
         epsilon=params["optimizer_adam_epsilon"])
 
-    if params["use_tpu"] and params["tpu"] != tpu_util.DRY_RUN:
+    if params["use_tpu"] and params["tpu"] != tpu_util.LOCAL:
       optimizer = tf.contrib.tpu.CrossShardOptimizer(optimizer)
 
     # Calculate and apply gradients using LazyAdamOptimizer.
@@ -269,6 +269,10 @@ def run_loop(
   """
 
   evaluate_bleu = bleu_source is not None and bleu_ref is not None
+  if evaluate_bleu and schedule_manager.use_tpu:
+    raise ValueError("BLEU score can not be computed when training with a TPU, "
+                     "as it requires estimator.predict which is not yet "
+                     "supported.")
 
   # Print details of training schedule.
   tf.logging.info("Training schedule:")
@@ -291,7 +295,7 @@ def run_loop(
         os.path.join(estimator.model_dir, BLEU_DIR))
     if bleu_threshold is not None:
       # Change loop stopping condition if bleu_threshold is defined.
-      train_eval_iterations = INF
+      schedule_manager.train_eval_iterations = INF
 
   # Loop training/evaluation/bleu cycles
   for i in xrange(schedule_manager.train_eval_iterations):
@@ -451,15 +455,11 @@ def construct_estimator(flags_obj, params, schedule_manager):
     return tf.estimator.Estimator(
         model_fn=model_fn, model_dir=flags_obj.model_dir, params=params)
 
-  dry_run = (flags_obj.tpu == tpu_util.DRY_RUN)
-  if dry_run:
-    tpu_cluster_resolver = None
-  else:
-    tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
-        tpu=flags_obj.tpu,
-        zone=flags_obj.tpu_zone,
-        project=flags_obj.tpu_gcp_project
-    )
+  tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
+      tpu=flags_obj.tpu,
+      zone=flags_obj.tpu_zone,
+      project=flags_obj.tpu_gcp_project
+  )
 
   tpu_config = tf.contrib.tpu.TPUConfig(
       iterations_per_loop = schedule_manager.single_iteration_train_steps,
@@ -474,7 +474,7 @@ def construct_estimator(flags_obj, params, schedule_manager):
 
   return tf.contrib.tpu.TPUEstimator(
       model_fn=model_fn,
-      use_tpu=params["use_tpu"] and not dry_run,
+      use_tpu=params["use_tpu"] and flags_obj.tpu != tpu_util.LOCAL,
       train_batch_size=schedule_manager.batch_size,
       eval_batch_size=schedule_manager.batch_size,
       params={

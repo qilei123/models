@@ -23,7 +23,11 @@ from tensorflow.python.ops import embedding_ops
 from tensorflow.python.ops import math_ops
 
 
-DRY_RUN = "dry_run"
+# "local" is a magic word in the TPU cluster resolver; it informs the resolver
+# to use the local CPU as the compute device. This is useful for testing and
+# debugging; the code flow is ostensibly identical, but without the need to
+# actually have a TPU on the other end.
+LOCAL = "local"
 
 
 # TODO(robieta): See if some version of this can be rolled into TPUEstimator.
@@ -31,7 +35,7 @@ def construct_scalar_host_call(metric_dict, model_dir, prefix=""):
   # type: (dict, str) -> (function, list)
   metric_names = list(metric_dict.keys())
 
-  def host_call_fn(gs, *args):
+  def host_call_fn(global_step, *args):
     """Training host call. Creates scalar summaries for training metrics.
 
     This function is executed on the CPU and should not directly reference
@@ -44,18 +48,18 @@ def construct_scalar_host_call(metric_dict, model_dir, prefix=""):
     element in the tuple passed to `host_call`.
 
     Args:
-      gs: `Tensor with shape `[batch]` for the global_step
+      global_step: `Tensor with shape `[batch]` for the global_step
       *args: Remaining tensors to log.
 
     Returns:
       List of summary ops to run on the CPU host.
     """
-    gs = gs[0]
+    step = global_step[0]
     with tf.contrib.summary.create_file_writer(
         logdir=model_dir, filename_suffix=".host_call").as_default():
       with tf.contrib.summary.always_record_summaries():
         for i, name in enumerate(metric_names):
-          tf.contrib.summary.scalar(prefix + name, args[i][0], step=gs)
+          tf.contrib.summary.scalar(prefix + name, args[i][0], step=step)
 
         return tf.contrib.summary.all_summary_ops()
 
@@ -64,10 +68,10 @@ def construct_scalar_host_call(metric_dict, model_dir, prefix=""):
   # expects [batch_size, ...] Tensors, thus reshape to introduce a batch
   # dimension. These Tensors are implicitly concatenated to
   # [params['batch_size']].
-  gs_t = tf.reshape(tf.train.get_or_create_global_step(), [1])
+  global_step_tensor = tf.reshape(tf.train.get_or_create_global_step(), [1])
   other_tensors = [tf.reshape(metric_dict[key], [1]) for key in metric_names]
 
-  return host_call_fn, [gs_t] + other_tensors
+  return host_call_fn, [global_step_tensor] + other_tensors
 
 
 def embedding_matmul(embedding_table, values, mask, name='embedding_matmul'):

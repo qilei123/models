@@ -53,7 +53,8 @@ def define_device(tpu=True):
         help=help_wrap(
             "The Cloud TPU to use for training. This should be either the name "
             "used when creating the Cloud TPU, or a "
-            "grpc://ip.address.of.tpu:8470 url."))
+            "grpc://ip.address.of.tpu:8470 url. Passing `local` will use the"
+            "CPU of the local instance instead. (Good for debugging.)"))
     key_flags.append("tpu")
 
     flags.DEFINE_string(
