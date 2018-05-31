@@ -167,7 +167,7 @@ def main(unused_argv):
       os.path.join(FLAGS.data_dir, FLAGS.vocab_file))
 
   # Set up estimator and params
-  params = transformer_main.PARAMS_MAP[FLAGS.param_set]().dict
+  params = transformer_main.PARAMS_MAP[FLAGS.param_set]
   params["beam_size"] = _BEAM_SIZE
   params["alpha"] = _ALPHA
   params["extra_decode_length"] = _EXTRA_DECODE_LENGTH
