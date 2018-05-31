@@ -71,15 +71,15 @@ class EmbeddingSharedWeights(tf.layers.Layer):
       # Create binary mask of size [batch_size, length]
       mask = tf.to_float(tf.not_equal(x, 0))
 
-      if self.method == "gather" and False:
+      if self.method == "gather":
         embeddings = tf.gather(self.shared_weights, x)
-        embeddings *= tf.expand_dims(mask, -1)
       else:  # matmul
         embeddings = tpu_utils.embedding_matmul(
             embedding_table=self.shared_weights,
             values=tf.cast(x, dtype=tf.int32),
             mask=mask
         )
+      embeddings *= tf.expand_dims(mask, -1)
 
       # Scale embedding by the sqrt of the hidden size
       embeddings *= self.hidden_size ** 0.5
