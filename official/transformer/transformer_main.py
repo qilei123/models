@@ -451,6 +451,16 @@ def define_transformer_flags():
 
 
 def construct_estimator(flags_obj, params, schedule_manager):
+  """Construct an estimator from either Estimator or TPUEstimator.
+
+  Args:
+    flags_obj: The FLAGS object parsed from command line.
+    params: A dict of run specific parameters.
+    schedule_manager: A schedule.Manager object containing the run schedule.
+
+  Returns:
+    An estimator object to be used for training and eval.
+  """
   if not params["use_tpu"]:
     return tf.estimator.Estimator(
         model_fn=model_fn, model_dir=flags_obj.model_dir, params=params)
@@ -462,7 +472,7 @@ def construct_estimator(flags_obj, params, schedule_manager):
   )
 
   tpu_config = tf.contrib.tpu.TPUConfig(
-      iterations_per_loop = schedule_manager.single_iteration_train_steps,
+      iterations_per_loop=schedule_manager.single_iteration_train_steps,
       num_shards=flags_obj.num_tpu_shards)
 
   run_config = tf.contrib.tpu.RunConfig(
@@ -478,8 +488,8 @@ def construct_estimator(flags_obj, params, schedule_manager):
       train_batch_size=schedule_manager.batch_size,
       eval_batch_size=schedule_manager.batch_size,
       params={
-        # TPUEstimator needs to populate batch_size itself due to sharding.
-        key: value for key, value in params.items() if key != "batch_size"},
+          # TPUEstimator needs to populate batch_size itself due to sharding.
+          key: value for key, value in params.items() if key != "batch_size"},
       config=run_config)
 
 
@@ -498,8 +508,8 @@ def run_transformer(flags_obj):
   params["tpu"] = flags_obj.tpu
   params["use_tpu"] = bool(flags_obj.tpu)  # was a tpu specified.
   params["batch_size"] = flags_obj.batch_size or (
-    params["default_batch_size_tpu"] if params["use_tpu"]
-    else params["default_batch_size"])
+      params["default_batch_size_tpu"] if params["use_tpu"]
+      else params["default_batch_size"])
   params["static_batch"] = flags_obj.static_batch or params["use_tpu"]
   params["allow_ffn_pad"] = not params["use_tpu"]
 

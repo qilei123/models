@@ -42,8 +42,8 @@ class Manager(object):
   """
 
   def __init__(self, train_steps, steps_between_evals, train_epochs,
-      epochs_between_evals, default_train_epochs, batch_size, max_length,
-      use_tpu=False, num_tpu_shards=8):
+               epochs_between_evals, default_train_epochs, batch_size,
+               max_length, use_tpu=False, num_tpu_shards=8):
     if train_steps and train_epochs:
       raise ValueError("Both train_steps or train_epochs were be defined.")
 
@@ -96,9 +96,9 @@ class Manager(object):
   @property
   def repeat_dataset(self):
     if (self._single_iteration_train_epochs is None and
-        self._single_iteration_train_steps >  dataset.NUM_EXAMPLES[_TRAIN]):
-      return ceil(self._single_iteration_train_steps /
-                  dataset.NUM_EXAMPLES[_TRAIN])
+        self._single_iteration_train_steps > dataset.NUM_EXAMPLES[_TRAIN]):
+      return math.ceil(self._single_iteration_train_steps /
+                       dataset.NUM_EXAMPLES[_TRAIN])
     return self._single_iteration_train_epochs
 
   def epochs_to_steps(self, num_epochs, mode):

@@ -124,9 +124,12 @@ def get_eval_metrics(logits, labels, params):
   if not params["use_tpu"]:
     # TPU does not support tf.py_func
     metrics.update({
-      "approx_bleu_score": _convert_to_eval_metric(bleu_score)(logits, labels),
-      "rouge_2_fscore": _convert_to_eval_metric(rouge_2_fscore)(logits, labels),
-      "rouge_L_fscore": _convert_to_eval_metric(rouge_l_fscore)(logits, labels),
+        "approx_bleu_score": _convert_to_eval_metric(
+            bleu_score)(logits, labels),
+        "rouge_2_fscore": _convert_to_eval_metric(
+            rouge_2_fscore)(logits, labels),
+        "rouge_L_fscore": _convert_to_eval_metric(
+            rouge_l_fscore)(logits, labels),
     })
 
   # Prefix each of the metric names with "metrics/". This allows the metric

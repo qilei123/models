@@ -303,10 +303,11 @@ class EncoderStack(tf.layers.Layer):
     for _ in range(params["num_hidden_layers"]):
       # Create sublayers for each layer.
       self_attention_layer = attention_layer.SelfAttention(
-          params["hidden_size"], params["num_heads"], params["attention_dropout"], train)
+          params["hidden_size"], params["num_heads"],
+          params["attention_dropout"], train)
       feed_forward_network = ffn_layer.FeedFowardNetwork(
-          params["hidden_size"], params["filter_size"], params["relu_dropout"], train,
-          params["allow_ffn_pad"])
+          params["hidden_size"], params["filter_size"],
+          params["relu_dropout"], train, params["allow_ffn_pad"])
 
       self.layers.append([
           PrePostProcessingWrapper(self_attention_layer, params, train),
@@ -358,12 +359,14 @@ class DecoderStack(tf.layers.Layer):
     self.layers = []
     for _ in range(params["num_hidden_layers"]):
       self_attention_layer = attention_layer.SelfAttention(
-          params["hidden_size"], params["num_heads"], params["attention_dropout"], train)
+          params["hidden_size"], params["num_heads"],
+          params["attention_dropout"], train)
       enc_dec_attention_layer = attention_layer.Attention(
-          params["hidden_size"], params["num_heads"], params["attention_dropout"], train)
+          params["hidden_size"], params["num_heads"],
+          params["attention_dropout"], train)
       feed_forward_network = ffn_layer.FeedFowardNetwork(
-          params["hidden_size"], params["filter_size"], params["relu_dropout"], train,
-          params["allow_ffn_pad"])
+          params["hidden_size"], params["filter_size"],
+          params["relu_dropout"], train, params["allow_ffn_pad"])
 
       self.layers.append([
           PrePostProcessingWrapper(self_attention_layer, params, train),

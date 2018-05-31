@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+"""Functions specific to running TensorFlow on TPUs."""
 
 import time
 
@@ -32,6 +33,16 @@ LOCAL = "local"
 
 # TODO(robieta): See if some version of this can be rolled into TPUEstimator.
 def construct_scalar_host_call(metric_dict, model_dir, prefix=""):
+  """Construct a host call to log scalars when training on TPU.
+
+  Args:
+    metric_dict: A dict of the tensors to be logged.
+    model_dir: The location to write the summary.
+    prefix: The prefix (if any) to prepend to the metric names.
+
+  Returns:
+    A tuple of (function, args_to_be_passed_to_said_function)
+  """
   # type: (dict, str) -> (function, list)
   metric_names = list(metric_dict.keys())
 
@@ -83,7 +94,8 @@ def embedding_matmul(embedding_table, values, mask, name='embedding_matmul'):
   range(num_embedding_table_rows).
 
   Args:
-    embedding_table: Tensor of embedding table. Rank 2 (table_size x embedding dim)
+    embedding_table: Tensor of embedding table.
+      Rank 2 (table_size x embedding dim)
     values: Tensor of embedding indices. Rank 2 (batch x n_indices)
     mask: Tensor of mask / weights. Rank 2 (batch x n_indices)
     name: Optional name scope for created ops
