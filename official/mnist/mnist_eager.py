@@ -33,12 +33,13 @@ import time
 from absl import app as absl_app
 from absl import flags
 import tensorflow as tf
-import tensorflow.contrib.eager as tfe
+from tensorflow.python import eager as tfe
 # pylint: enable=g-bad-import-order
 
 from official.mnist import dataset as mnist_dataset
 from official.mnist import mnist
 from official.utils.flags import core as flags_core
+from official.utils.misc import model_helpers
 
 
 def loss(logits, labels):
@@ -59,7 +60,7 @@ def train(model, optimizer, dataset, step_counter, log_interval=None):
   """Trains model on `dataset` using `optimizer`."""
 
   start = time.time()
-  for (batch, (images, labels)) in enumerate(tfe.Iterator(dataset)):
+  for (batch, (images, labels)) in enumerate(dataset):
     with tf.contrib.summary.record_summaries_every_n_global_steps(
         10, global_step=step_counter):
       # Record the operations used to compute the loss given the input,
@@ -81,13 +82,13 @@ def train(model, optimizer, dataset, step_counter, log_interval=None):
 
 def test(model, dataset):
   """Perform an evaluation of `model` on the examples from `dataset`."""
-  avg_loss = tfe.metrics.Mean('loss')
-  accuracy = tfe.metrics.Accuracy('accuracy')
+  avg_loss = tf.keras.metrics.Mean('loss', dtype=tf.float32)
+  accuracy = tf.keras.metrics.Accuracy('accuracy', dtype=tf.float32)
 
-  for (images, labels) in tfe.Iterator(dataset):
+  for (images, labels) in dataset:
     logits = model(images, training=False)
-    avg_loss(loss(logits, labels))
-    accuracy(
+    avg_loss.update_state(loss(logits, labels))
+    accuracy.update_state(
         tf.argmax(logits, axis=1, output_type=tf.int64),
         tf.cast(labels, tf.int64))
   print('Test set: Average loss: %.4f, Accuracy: %4f%%\n' %
@@ -104,6 +105,7 @@ def run_mnist_eager(flags_obj):
     flags_obj: An object containing parsed flag values.
   """
   tf.enable_eager_execution()
+  model_helpers.apply_clean(flags.FLAGS)
 
   # Automatically determine device and data_format
   (device, data_format) = ('/gpu:0', 'channels_first')
@@ -143,7 +145,7 @@ def run_mnist_eager(flags_obj):
   # Create and restore checkpoint (if one exists on the path)
   checkpoint_prefix = os.path.join(flags_obj.model_dir, 'ckpt')
   step_counter = tf.train.get_or_create_global_step()
-  checkpoint = tfe.Checkpoint(
+  checkpoint = tf.train.Checkpoint(
       model=model, optimizer=optimizer, step_counter=step_counter)
   # Restore variables on creation if a checkpoint exists.
   checkpoint.restore(tf.train.latest_checkpoint(flags_obj.model_dir))
@@ -167,7 +169,8 @@ def run_mnist_eager(flags_obj):
 
 def define_mnist_eager_flags():
   """Defined flags and defaults for MNIST in eager mode."""
-  flags_core.define_base_eager()
+  flags_core.define_base(clean=True, train_epochs=True, export_dir=True,
+                         distribution_strategy=True)
   flags_core.define_image()
   flags.adopt_module_key_flags(flags_core)
 

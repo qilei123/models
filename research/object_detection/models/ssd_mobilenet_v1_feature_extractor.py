@@ -39,6 +39,7 @@ class SSDMobileNetV1FeatureExtractor(ssd_meta_arch.SSDFeatureExtractor):
                reuse_weights=None,
                use_explicit_padding=False,
                use_depthwise=False,
+               num_layers=6,
                override_base_feature_extractor_hyperparams=False):
     """MobileNetV1 Feature Extractor for SSD Models.
 
@@ -56,13 +57,22 @@ class SSDMobileNetV1FeatureExtractor(ssd_meta_arch.SSDFeatureExtractor):
         inputs so that the output dimensions are the same as if 'SAME' padding
         were used.
       use_depthwise: Whether to use depthwise convolutions. Default is False.
+      num_layers: Number of SSD layers.
       override_base_feature_extractor_hyperparams: Whether to override
         hyperparameters of the base feature extractor with the one from
         `conv_hyperparams_fn`.
     """
     super(SSDMobileNetV1FeatureExtractor, self).__init__(
-        is_training, depth_multiplier, min_depth, pad_to_multiple,
-        conv_hyperparams_fn, reuse_weights, use_explicit_padding, use_depthwise,
+        is_training=is_training,
+        depth_multiplier=depth_multiplier,
+        min_depth=min_depth,
+        pad_to_multiple=pad_to_multiple,
+        conv_hyperparams_fn=conv_hyperparams_fn,
+        reuse_weights=reuse_weights,
+        use_explicit_padding=use_explicit_padding,
+        use_depthwise=use_depthwise,
+        num_layers=num_layers,
+        override_base_feature_extractor_hyperparams=
         override_base_feature_extractor_hyperparams)
 
   def preprocess(self, resized_inputs):
@@ -96,8 +106,8 @@ class SSDMobileNetV1FeatureExtractor(ssd_meta_arch.SSDFeatureExtractor):
 
     feature_map_layout = {
         'from_layer': ['Conv2d_11_pointwise', 'Conv2d_13_pointwise', '', '',
-                       '', ''],
-        'layer_depth': [-1, -1, 512, 256, 256, 128],
+                       '', ''][:self._num_layers],
+        'layer_depth': [-1, -1, 512, 256, 256, 128][:self._num_layers],
         'use_explicit_padding': self._use_explicit_padding,
         'use_depthwise': self._use_depthwise,
     }
@@ -110,23 +120,19 @@ class SSDMobileNetV1FeatureExtractor(ssd_meta_arch.SSDFeatureExtractor):
         with (slim.arg_scope(self._conv_hyperparams_fn())
               if self._override_base_feature_extractor_hyperparams
               else context_manager.IdentityContextManager()):
-        # TODO(skligys): Enable fused batch norm once quantization supports it.
-          with slim.arg_scope([slim.batch_norm], fused=False):
-            _, image_features = mobilenet_v1.mobilenet_v1_base(
-                ops.pad_to_multiple(preprocessed_inputs, self._pad_to_multiple),
-                final_endpoint='Conv2d_13_pointwise',
-                min_depth=self._min_depth,
-                depth_multiplier=self._depth_multiplier,
-                use_explicit_padding=self._use_explicit_padding,
-                scope=scope)
-      with slim.arg_scope(self._conv_hyperparams_fn()):
-        # TODO(skligys): Enable fused batch norm once quantization supports it.
-        with slim.arg_scope([slim.batch_norm], fused=False):
-          feature_maps = feature_map_generators.multi_resolution_feature_maps(
-              feature_map_layout=feature_map_layout,
-              depth_multiplier=self._depth_multiplier,
+          _, image_features = mobilenet_v1.mobilenet_v1_base(
+              ops.pad_to_multiple(preprocessed_inputs, self._pad_to_multiple),
+              final_endpoint='Conv2d_13_pointwise',
               min_depth=self._min_depth,
-              insert_1x1_conv=True,
-              image_features=image_features)
+              depth_multiplier=self._depth_multiplier,
+              use_explicit_padding=self._use_explicit_padding,
+              scope=scope)
+      with slim.arg_scope(self._conv_hyperparams_fn()):
+        feature_maps = feature_map_generators.multi_resolution_feature_maps(
+            feature_map_layout=feature_map_layout,
+            depth_multiplier=self._depth_multiplier,
+            min_depth=self._min_depth,
+            insert_1x1_conv=True,
+            image_features=image_features)
 
     return feature_maps.values()
